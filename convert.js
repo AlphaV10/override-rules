@@ -32,6 +32,13 @@ function parseNumber(value, defaultValue = 0) {
     return isNaN(num) ? defaultValue : num;
 }
 
+function getTestPolicy(type = "url-test") {
+    if (type === "url-test") {
+        return isPeakHour() ? { interval: 60, tolerance: 20 } : { interval: 120, tolerance: 50 };
+    }
+    return isPeakHour() ? { interval: 150, tolerance: 20 } : { interval: 300, tolerance: 50 };
+}
+
 /**
  * 判断当前是否为高峰时期 (17:00 - 01:00)
  * @returns {boolean} 如果是高峰期返回 true，否则返回 false
@@ -117,6 +124,7 @@ function stripNodeSuffix(groupNames) {
 const PROXY_GROUPS = {
     SELECT: "选择代理",
     MANUAL: "手动选择",
+    FASTEST: "自动优选",
     FALLBACK: "故障转移",
     DIRECT: "直连",
     FOREIGN: "境外节点",
@@ -137,8 +145,10 @@ function buildBaseLists({ landing, lowCostNodes, countryGroupNames }) {
      * "选择代理"组的顶层候选列表：故障转移 → 落地节点（可选）→ 各国家组 → 低倍率（可选）→ 手动 → 直连。
      */
     const defaultSelector = buildList(
+        PROXY_GROUPS.FASTEST,
         PROXY_GROUPS.FALLBACK,
         landing && PROXY_GROUPS.LANDING,
+        PROXY_GROUPS.FOREIGN,
         countryGroupNames,
         lowCost && PROXY_GROUPS.LOW_COST,
         PROXY_GROUPS.MANUAL,
@@ -523,7 +533,7 @@ function buildCountryProxyGroups({ countries, landing, loadBalance, regexFilter,
         ? Object.fromEntries(countryInfo.map((item) => [item.country, item.nodes]))
         : null;
 
-    const [interval, tolerance, lazy] = isPeakHour() ? [60, 20, false] : [120, 50, true];
+    const fastestPolicy = getTestPolicy("url-test");
 
     for (const country of countries) {
         const meta = countriesMeta[country];
@@ -563,9 +573,8 @@ function buildCountryProxyGroups({ countries, landing, loadBalance, regexFilter,
         if (!loadBalance) {
             Object.assign(groupConfig, {
                 url: "https://cp.cloudflare.com/generate_204",
-                interval,
-                tolerance,
-                lazy,
+                lazy: true,
+                ...fastestPolicy,
             });
         }
 
@@ -597,11 +606,12 @@ function buildProxyGroups({
           )
         : [];
 
-    const [interval, tolerance, lazy] = isPeakHour() ? [150, 20, false] : [300, 50, true];
+    const fallbackPolicy = getTestPolicy("fallback");
+    const fastestPolicy = getTestPolicy("url-test");
 
-    const foreignProxyGroups = countries
-        .filter((country) => !["香港", "澳门", "台湾"].includes(country))
-        .map((country) => country + NODE_SUFFIX);
+    const foreignProxyGroups = countries.flatMap((country) => {
+        return !["香港", "澳门", "台湾"].includes(country) ? `${country}${NODE_SUFFIX}` : [];
+    });
 
     return [
         {
@@ -650,14 +660,21 @@ function buildProxyGroups({
               }
             : null,
         {
+            name: PROXY_GROUPS.FASTEST,
+            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png",
+            "include-all": true,
+            type: "url-test",
+            lazy: true,
+            ...fastestPolicy,
+        },
+        {
             name: PROXY_GROUPS.FALLBACK,
             icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bypass.png",
             type: "fallback",
             url: "https://cp.cloudflare.com/generate_204",
             proxies: defaultFallback,
-            interval,
-            tolerance,
-            lazy,
+            lazy: true,
+            ...fallbackPolicy,
         },
         {
             name: "静态资源",
@@ -719,9 +736,8 @@ function buildProxyGroups({
                   icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Lab.png",
                   type: "url-test",
                   url: "https://cp.cloudflare.com/generate_204",
-                  interval,
-                  tolerance,
-                  lazy,
+                  lazy: true,
+                  ...fastestPolicy,
                   ...(!regexFilter
                       ? { proxies: lowCostNodes }
                       : { "include-all": true, filter: "(?i)0\\.[0-5]|低倍率|省流|大流量|实验性" }),
@@ -732,10 +748,9 @@ function buildProxyGroups({
             icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Catnet.png",
             type: "fallback",
             url: "https://cp.cloudflare.com/generate_204",
-            proxies: [...foreignProxyGroups, PROXY_GROUPS.SELECT],
-            interval,
-            tolerance,
-            lazy,
+            proxies: foreignProxyGroups,
+            lazy: true,
+            ...fallbackPolicy,
         },
         ...countryProxyGroups,
     ].filter(Boolean);
