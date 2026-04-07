@@ -33,6 +33,20 @@ function parseNumber(value, defaultValue = 0) {
 }
 
 /**
+ * 判断当前是否为高峰时期 (17:00 - 01:00)
+ * @returns {boolean} 如果是高峰期返回 true，否则返回 false
+ */
+function isPeakHour() {
+    // 1. 获取当前本地时间对象
+    const now = new Date();
+    // 2. 获取当前小时数 (返回 0-23 之间的整数)
+    const hours = now.getHours();
+    // 3. 判断是否在 17 点（含）到 01 点（不含）之间
+    // 注意：在 Date 对象中，24:00 实际上是次日的 0:00，所以 23 点是当天最后的小时
+    return hours >= 17 || hours < 1;
+}
+
+/**
  * 解析传入的脚本参数，并将其转换为内部使用的功能开关（feature flags）。
  * @param {object} args - 传入的原始参数对象，如 $arguments。
  * @returns {object} - 包含所有功能开关状态的对象。
@@ -105,6 +119,7 @@ const PROXY_GROUPS = {
     MANUAL: "手动选择",
     FALLBACK: "故障转移",
     DIRECT: "直连",
+    FOREIGN: "境外节点",
     LANDING: "落地节点",
     LOW_COST: "低倍率节点",
 };
@@ -176,14 +191,6 @@ const ruleProviders = {
         url: "https://gcore.jsdelivr.net/gh/217heidai/adblockfilters@main/rules/adblockmihomolite.mrs",
         path: "./ruleset/ADBlock.mrs",
     },
-    SogouInput: {
-        type: "http",
-        behavior: "classical",
-        format: "text",
-        interval: 86400,
-        url: "https://ruleset.skk.moe/Clash/non_ip/sogouinput.txt",
-        path: "./ruleset/SogouInput.txt",
-    },
     StaticResources: {
         type: "http",
         behavior: "domain",
@@ -207,14 +214,6 @@ const ruleProviders = {
         interval: 86400,
         url: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/ruleset/TikTok.list",
         path: "./ruleset/TikTok.list",
-    },
-    EHentai: {
-        type: "http",
-        behavior: "classical",
-        format: "text",
-        interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/ruleset/EHentai.list",
-        path: "./ruleset/EHentai.list",
     },
     SteamFix: {
         type: "http",
@@ -259,15 +258,15 @@ const ruleProviders = {
 };
 
 const baseRules = [
+    `GEOSITE,PRIVATE,${PROXY_GROUPS.DIRECT}`,
+    `GEOIP,PRIVATE,${PROXY_GROUPS.DIRECT},no-resolve`,
+    `DOMAIN-SUFFIX,zeabur.com,${PROXY_GROUPS.FOREIGN}`,
     `RULE-SET,ADBlock,广告拦截`,
     `RULE-SET,AdditionalFilter,广告拦截`,
-    `RULE-SET,SogouInput,搜狗输入法`,
-    `DOMAIN-SUFFIX,truthsocial.com,Truth Social`,
     `RULE-SET,StaticResources,静态资源`,
     `RULE-SET,CDNResources,静态资源`,
     `RULE-SET,AdditionalCDNResources,静态资源`,
     `RULE-SET,Crypto,Crypto`,
-    `RULE-SET,EHentai,E-Hentai`,
     `RULE-SET,TikTok,TikTok`,
     `RULE-SET,SteamFix,${PROXY_GROUPS.DIRECT}`,
     `RULE-SET,GoogleFCM,${PROXY_GROUPS.DIRECT}`,
@@ -275,23 +274,12 @@ const baseRules = [
     "GEOSITE,CATEGORY-AI-!CN,AI",
     `GEOSITE,GOOGLE-PLAY@CN,${PROXY_GROUPS.DIRECT}`,
     `GEOSITE,MICROSOFT@CN,${PROXY_GROUPS.DIRECT}`,
-    "GEOSITE,ONEDRIVE,OneDrive",
-    "GEOSITE,MICROSOFT,Microsoft",
     "GEOSITE,TELEGRAM,Telegram",
     "GEOSITE,YOUTUBE,YouTube",
-    "GEOSITE,GOOGLE,Google",
-    "GEOSITE,NETFLIX,Netflix",
-    "GEOSITE,SPOTIFY,Spotify",
-    "GEOSITE,BAHAMUT,Bahamut",
-    "GEOSITE,BILIBILI,Bilibili",
-    "GEOSITE,PIKPAK,PikPak",
     `GEOSITE,GFW,${PROXY_GROUPS.SELECT}`,
     `GEOSITE,CN,${PROXY_GROUPS.DIRECT}`,
-    `GEOSITE,PRIVATE,${PROXY_GROUPS.DIRECT}`,
-    "GEOIP,NETFLIX,Netflix,no-resolve",
     "GEOIP,TELEGRAM,Telegram,no-resolve",
     `GEOIP,CN,${PROXY_GROUPS.DIRECT}`,
-    `GEOIP,PRIVATE,${PROXY_GROUPS.DIRECT}`,
     "DST-PORT,22,SSH(22端口)",
     `MATCH,${PROXY_GROUPS.SELECT}`,
 ];
@@ -379,8 +367,18 @@ const geoxURL = {
  * `pattern` 是用于匹配节点名称的正则字符串；`icon` 为策略组图标 URL。
  */
 const countriesMeta = {
-    香港: {
+    日本: {
         weight: 10,
+        pattern: "日本|川日|东京|大阪|泉日|埼玉|沪日|深日|JP|Japan|🇯🇵",
+        icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Japan.png",
+    },
+    新加坡: {
+        weight: 20,
+        pattern: "新加坡|坡|狮城|SG|Singapore|🇸🇬",
+        icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Singapore.png",
+    },
+    香港: {
+        weight: 30,
         pattern: "香港|港|HK|hk|Hong Kong|HongKong|hongkong|🇭🇰",
         icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Hong_Kong.png",
     },
@@ -389,19 +387,9 @@ const countriesMeta = {
         icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Macao.png",
     },
     台湾: {
-        weight: 20,
+        weight: 40,
         pattern: "台|新北|彰化|TW|Taiwan|🇹🇼",
         icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Taiwan.png",
-    },
-    新加坡: {
-        weight: 30,
-        pattern: "新加坡|坡|狮城|SG|Singapore|🇸🇬",
-        icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Singapore.png",
-    },
-    日本: {
-        weight: 40,
-        pattern: "日本|川日|东京|大阪|泉日|埼玉|沪日|深日|JP|Japan|🇯🇵",
-        icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Japan.png",
     },
     韩国: {
         pattern: "KR|Korea|KOR|首尔|韩|韓|🇰🇷",
@@ -535,6 +523,8 @@ function buildCountryProxyGroups({ countries, landing, loadBalance, regexFilter,
         ? Object.fromEntries(countryInfo.map((item) => [item.country, item.nodes]))
         : null;
 
+    const [interval, tolerance, lazy] = isPeakHour() ? [60, 20, false] : [120, 50, true];
+
     for (const country of countries) {
         const meta = countriesMeta[country];
         if (!meta) continue;
@@ -573,9 +563,9 @@ function buildCountryProxyGroups({ countries, landing, loadBalance, regexFilter,
         if (!loadBalance) {
             Object.assign(groupConfig, {
                 url: "https://cp.cloudflare.com/generate_204",
-                interval: 60,
-                tolerance: 20,
-                lazy: false,
+                interval,
+                tolerance,
+                lazy,
             });
         }
 
@@ -597,14 +587,6 @@ function buildProxyGroups({
     defaultFallback,
 }) {
     /**
-     * 预先判断是否存在特定地区的节点，用于为 Bilibili、Bahamut、Truth Social 等
-     * 有地区偏好的策略组提供更精准的候选列表。
-     */
-    const hasTW = countries.includes("台湾");
-    const hasHK = countries.includes("香港");
-    const hasUS = countries.includes("美国");
-
-    /**
      * "前置代理"组的候选列表：从 `defaultSelector` 中移除"落地节点"和"故障转移"，
      * 避免前置代理与落地节点形成循环引用，以及与故障转移组相互嵌套。
      * 仅在 `landing=true` 时使用；否则置为空数组。
@@ -614,6 +596,12 @@ function buildProxyGroups({
               (name) => name !== PROXY_GROUPS.LANDING && name !== PROXY_GROUPS.FALLBACK
           )
         : [];
+
+    const [interval, tolerance, lazy] = isPeakHour() ? [150, 20, false] : [300, 50, true];
+
+    const foreignProxyGroups = countries
+        .filter((country) => !["香港", "澳门", "台湾"].includes(country))
+        .map((country) => country + NODE_SUFFIX);
 
     return [
         {
@@ -667,9 +655,9 @@ function buildProxyGroups({
             type: "fallback",
             url: "https://cp.cloudflare.com/generate_204",
             proxies: defaultFallback,
-            interval: 180,
-            tolerance: 20,
-            lazy: false,
+            interval,
+            tolerance,
+            lazy,
         },
         {
             name: "静态资源",
@@ -690,43 +678,8 @@ function buildProxyGroups({
             proxies: defaultProxies,
         },
         {
-            name: "Google",
-            icon: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/icons/Google.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "Microsoft",
-            icon: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/icons/Microsoft_Copilot.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
             name: "YouTube",
             icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "Bilibili",
-            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/bilibili.png",
-            type: "select",
-            proxies:
-                hasTW && hasHK
-                    ? [PROXY_GROUPS.DIRECT, "台湾节点", "香港节点"]
-                    : defaultProxiesDirect,
-        },
-        {
-            name: "Bahamut",
-            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Bahamut.png",
-            type: "select",
-            proxies: hasTW
-                ? ["台湾节点", PROXY_GROUPS.SELECT, PROXY_GROUPS.MANUAL, PROXY_GROUPS.DIRECT]
-                : defaultProxies,
-        },
-        {
-            name: "Netflix",
-            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Netflix.png",
             type: "select",
             proxies: defaultProxies,
         },
@@ -737,40 +690,8 @@ function buildProxyGroups({
             proxies: defaultProxies,
         },
         {
-            name: "Spotify",
-            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "E-Hentai",
-            icon: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/icons/Ehentai.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
             name: "Telegram",
             icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "Truth Social",
-            icon: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/icons/TruthSocial.png",
-            type: "select",
-            proxies: hasUS
-                ? ["美国节点", PROXY_GROUPS.SELECT, PROXY_GROUPS.MANUAL]
-                : defaultProxies,
-        },
-        {
-            name: "OneDrive",
-            icon: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/icons/Onedrive.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "PikPak",
-            icon: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/icons/PikPak.png",
             type: "select",
             proxies: defaultProxies,
         },
@@ -779,12 +700,6 @@ function buildProxyGroups({
             icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png",
             type: "select",
             proxies: defaultProxies,
-        },
-        {
-            name: "搜狗输入法",
-            icon: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/icons/Sougou.png",
-            type: "select",
-            proxies: [PROXY_GROUPS.DIRECT, "REJECT"],
         },
         {
             name: PROXY_GROUPS.DIRECT,
@@ -804,11 +719,24 @@ function buildProxyGroups({
                   icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Lab.png",
                   type: "url-test",
                   url: "https://cp.cloudflare.com/generate_204",
+                  interval,
+                  tolerance,
+                  lazy,
                   ...(!regexFilter
                       ? { proxies: lowCostNodes }
                       : { "include-all": true, filter: "(?i)0\\.[0-5]|低倍率|省流|大流量|实验性" }),
               }
             : null,
+        {
+            name: PROXY_GROUPS.FOREIGN,
+            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Catnet.png",
+            type: "fallback",
+            url: "https://cp.cloudflare.com/generate_204",
+            proxies: [...foreignProxyGroups, PROXY_GROUPS.SELECT],
+            interval,
+            tolerance,
+            lazy,
+        },
         ...countryProxyGroups,
     ].filter(Boolean);
 }
