@@ -8,9 +8,9 @@ https://github.com/powerfullz/override-rules
 - ipv6: 启用 IPv6 支持（默认 false）
 - full: 输出完整配置（适合纯内核启动，默认 false）
 - keepalive: 启用 tcp-keep-alive（默认 false）
-- fakeip: DNS 使用 FakeIP 模式（默认 false，false 为 RedirHost）
-- quic: 允许 QUIC 流量（UDP 443，默认 false）
-- threshold: 国家节点数量小于该值时不显示分组 (默认 0)
+- nofakeip: DNS 禁用 FakeIP 模式（默认 false，false 为 FakeIP，true 为 RedirHost）
+- noquic: 禁用 QUIC 流量（UDP 443，默认 false，false 表示允许 QUIC）
+- threshold: 国家节点数量小于该值时不显示分组 (默认 2)
 - regex: 使用正则过滤模式（include-all + filter）写入各国家代理组，而非直接枚举节点名称（默认 false）
 */
 
@@ -69,8 +69,8 @@ function buildFeatureFlags(args) {
         ipv6: "ipv6Enabled",
         full: "fullConfig",
         keepalive: "keepAliveEnabled",
-        fakeip: "fakeIPEnabled",
-        quic: "quicEnabled",
+        nofakeip: "noFakeIP",
+        noquic: "noQuic",
         regex: "regexFilter",
     };
 
@@ -82,7 +82,7 @@ function buildFeatureFlags(args) {
     /**
      * `threshold` 是数字参数，不经过 parseBool，需单独处理。
      */
-    flags.countryThreshold = parseNumber(args.threshold, 0);
+    flags.countryThreshold = parseNumber(args.threshold, 2);
 
     return flags;
 }
@@ -94,8 +94,8 @@ const {
     ipv6Enabled,
     fullConfig,
     keepAliveEnabled,
-    fakeIPEnabled,
-    quicEnabled,
+    noFakeIP,
+    noQuic,
     regexFilter,
     countryThreshold,
 } = buildFeatureFlags(rawArgs);
@@ -124,7 +124,7 @@ function stripNodeSuffix(groupNames) {
 const PROXY_GROUPS = {
     SELECT: "选择代理",
     MANUAL: "手动选择",
-    FASTEST: "自动优选",
+    CLEAN: "纯净优选",
     FALLBACK: "故障转移",
     DIRECT: "直连",
     FOREIGN: "境外节点",
@@ -145,7 +145,7 @@ function buildBaseLists({ landing, lowCostNodes, countryGroupNames }) {
      * "选择代理"组的顶层候选列表：故障转移 → 落地节点（可选）→ 各国家组 → 低倍率（可选）→ 手动 → 直连。
      */
     const defaultSelector = buildList(
-        PROXY_GROUPS.FASTEST,
+        PROXY_GROUPS.CLEAN,
         PROXY_GROUPS.FALLBACK,
         landing && PROXY_GROUPS.LANDING,
         PROXY_GROUPS.FOREIGN,
@@ -217,36 +217,12 @@ const ruleProviders = {
         url: "https://ruleset.skk.moe/Clash/non_ip/cdn.txt",
         path: "./ruleset/CDNResources.txt",
     },
-    TikTok: {
-        type: "http",
-        behavior: "classical",
-        format: "text",
-        interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/ruleset/TikTok.list",
-        path: "./ruleset/TikTok.list",
-    },
-    SteamFix: {
-        type: "http",
-        behavior: "classical",
-        format: "text",
-        interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/ruleset/SteamFix.list",
-        path: "./ruleset/SteamFix.list",
-    },
-    GoogleFCM: {
-        type: "http",
-        behavior: "classical",
-        format: "text",
-        interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/ruleset/FirebaseCloudMessaging.list",
-        path: "./ruleset/FirebaseCloudMessaging.list",
-    },
     AdditionalFilter: {
         type: "http",
         behavior: "classical",
         format: "text",
         interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/ruleset/AdditionalFilter.list",
+        url: "https://gcore.jsdelivr.net/gh/andychey/static@v0.0.2/metaX/ruleset/AdditionalFilter.list",
         path: "./ruleset/AdditionalFilter.list",
     },
     AdditionalCDNResources: {
@@ -254,49 +230,34 @@ const ruleProviders = {
         behavior: "classical",
         format: "text",
         interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/ruleset/AdditionalCDNResources.list",
+        url: "https://gcore.jsdelivr.net/gh/andychey/static@v0.0.2/metaX/ruleset/AdditionalCDNResources.list",
         path: "./ruleset/AdditionalCDNResources.list",
-    },
-    Crypto: {
-        type: "http",
-        behavior: "classical",
-        format: "text",
-        interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/ruleset/Crypto.list",
-        path: "./ruleset/Crypto.list",
     },
 };
 
 const baseRules = [
+    `IP-CIDR,1.1.1.1/32,${PROXY_GROUPS.SELECT},no-resolve`,
+    `IP-CIDR,8.8.8.8/32,${PROXY_GROUPS.SELECT},no-resolve`,
     `GEOSITE,PRIVATE,${PROXY_GROUPS.DIRECT}`,
     `GEOIP,PRIVATE,${PROXY_GROUPS.DIRECT},no-resolve`,
-    `DOMAIN-SUFFIX,zeabur.com,${PROXY_GROUPS.FOREIGN}`,
     `RULE-SET,ADBlock,广告拦截`,
     `RULE-SET,AdditionalFilter,广告拦截`,
     `RULE-SET,StaticResources,静态资源`,
     `RULE-SET,CDNResources,静态资源`,
     `RULE-SET,AdditionalCDNResources,静态资源`,
-    `RULE-SET,Crypto,Crypto`,
-    `RULE-SET,TikTok,TikTok`,
-    `RULE-SET,SteamFix,${PROXY_GROUPS.DIRECT}`,
-    `RULE-SET,GoogleFCM,${PROXY_GROUPS.DIRECT}`,
     `DOMAIN,services.googleapis.cn,${PROXY_GROUPS.SELECT}`,
-    "GEOSITE,CATEGORY-AI-!CN,AI",
-    `GEOSITE,GOOGLE-PLAY@CN,${PROXY_GROUPS.DIRECT}`,
-    `GEOSITE,MICROSOFT@CN,${PROXY_GROUPS.DIRECT}`,
+    `DOMAIN-SUFFIX,zeabur.com,${PROXY_GROUPS.FOREIGN}`,
     "GEOSITE,TELEGRAM,Telegram",
-    "GEOSITE,YOUTUBE,YouTube",
     `GEOSITE,GFW,${PROXY_GROUPS.SELECT}`,
     `GEOSITE,CN,${PROXY_GROUPS.DIRECT}`,
     "GEOIP,TELEGRAM,Telegram,no-resolve",
     `GEOIP,CN,${PROXY_GROUPS.DIRECT}`,
-    "DST-PORT,22,SSH(22端口)",
     `MATCH,${PROXY_GROUPS.SELECT}`,
 ];
 
-function buildRules({ quicEnabled }) {
+function buildRules({ noQuic }) {
     const ruleList = [...baseRules];
-    if (!quicEnabled) {
+    if (noQuic) {
         /**
          * 屏蔽 UDP 443（QUIC）流量。
          * 部分网络环境下 UDP 性能不稳定，禁用 QUIC 可强制回退到 TCP，改善整体体验。
@@ -366,10 +327,10 @@ const dnsConfigFakeIp = buildDnsConfig({
 });
 
 const geoxURL = {
-    geoip: "https://gcore.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat",
-    geosite: "https://gcore.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat",
-    mmdb: "https://gcore.jsdelivr.net/gh/Loyalsoldier/geoip@release/Country.mmdb",
-    asn: "https://gcore.jsdelivr.net/gh/Loyalsoldier/geoip@release/GeoLite2-ASN.mmdb",
+    geoip: "https://gcore.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip-lite.dat",
+    geosite: "https://gcore.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat",
+    mmdb: "https://gcore.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.metadb",
+    asn: "https://gcore.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/GeoLite2-ASN.mmdb",
 };
 
 /**
@@ -449,9 +410,17 @@ const countriesMeta = {
         pattern: "马来西亚|马来|MY|Malaysia|🇲🇾",
         icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Malaysia.png",
     },
+    巴西: {
+        pattern: "巴西|巴|BR|Brazil|🇧🇷",
+        icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Brazil.png",
+    },
+    荷兰: {
+        pattern: "荷兰|荷|NL|Netherlands|Holland|🇳🇱",
+        icon: "https://gcore.jsdelivr.net/npm/svg-country-flags@latest/png100px/nl.png",
+    },
 };
 
-const LOW_COST_REGEX = /0\.[0-5]|低倍率|省流|大流量|实验性/i;
+const LOW_COST_REGEX = /(?<!\d)0\.[0-5]|低倍率|省流|大流量|实验性/i;
 const LANDING_REGEX = /家宽|家庭|家庭宽带|商宽|商业宽带|星链|Starlink|落地/i;
 /**
  * `LANDING_PATTERN` 与 `LANDING_REGEX` 描述同一规则，但格式不同：
@@ -460,6 +429,9 @@ const LANDING_REGEX = /家宽|家庭|家庭宽带|商宽|商业宽带|星链|Sta
  *   其中 `(?i)` 前缀是 Clash/Mihomo 的不区分大小写语法。
  */
 const LANDING_PATTERN = "(?i)家宽|家庭|家庭宽带|商宽|商业宽带|星链|Starlink|落地";
+// 被污染的节点，使用这些节点可能无法访问部分服务（如 Gemini、ChatGPT 等），不过不一定完全不可用。
+// 因此将它们排除在"纯净优选"之外，但不是直接丢弃，用户可根据需要选择是否使用这些节点。
+const DIRTY_REGEX = /新加坡专线4/;
 
 function parseLowCost(config) {
     return (config.proxies || [])
@@ -471,6 +443,15 @@ function parseLandingNodes(config) {
     return (config.proxies || [])
         .filter((proxy) => LANDING_REGEX.test(proxy.name))
         .map((proxy) => proxy.name);
+}
+
+function parseCleanNodes(config) {
+    return (config.proxies || []).flatMap((proxy) => {
+        if (DIRTY_REGEX.test(proxy.name) || LOW_COST_REGEX.test(proxy.name)) {
+            return [];
+        }
+        return [proxy.name];
+    });
 }
 
 /**
@@ -590,6 +571,7 @@ function buildProxyGroups({
     countryProxyGroups,
     lowCostNodes,
     landingNodes,
+    cleanNodes,
     defaultProxies,
     defaultProxiesDirect,
     defaultSelector,
@@ -660,12 +642,12 @@ function buildProxyGroups({
               }
             : null,
         {
-            name: PROXY_GROUPS.FASTEST,
+            name: PROXY_GROUPS.CLEAN,
             icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png",
-            "include-all": true,
             type: "url-test",
             lazy: true,
             ...fastestPolicy,
+            proxies: cleanNodes,
         },
         {
             name: PROXY_GROUPS.FALLBACK,
@@ -683,38 +665,8 @@ function buildProxyGroups({
             proxies: defaultProxies,
         },
         {
-            name: "AI",
-            icon: "https://gcore.jsdelivr.net/gh/powerfullz/override-rules@master/icons/chatgpt.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "Crypto",
-            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Cryptocurrency_3.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "YouTube",
-            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "TikTok",
-            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
             name: "Telegram",
             icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png",
-            type: "select",
-            proxies: defaultProxies,
-        },
-        {
-            name: "SSH(22端口)",
-            icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Server.png",
             type: "select",
             proxies: defaultProxies,
         },
@@ -767,6 +719,7 @@ function main(config) {
     const countryInfo = parseCountries(resultConfig);
     const lowCostNodes = parseLowCost(resultConfig);
     const landingNodes = landing ? parseLandingNodes(resultConfig) : [];
+    const cleanNodes = parseCleanNodes(resultConfig);
     const countryGroupNames = getCountryGroupNames(countryInfo, countryThreshold);
     const countries = stripNodeSuffix(countryGroupNames);
 
@@ -796,6 +749,7 @@ function main(config) {
         countryProxyGroups,
         lowCostNodes,
         landingNodes,
+        cleanNodes,
         defaultProxies,
         defaultProxiesDirect,
         defaultSelector,
@@ -815,7 +769,7 @@ function main(config) {
         proxies: globalProxies,
     });
 
-    const finalRules = buildRules({ quicEnabled });
+    const finalRules = buildRules({ noQuic });
 
     if (fullConfig)
         Object.assign(resultConfig, {
@@ -828,7 +782,7 @@ function main(config) {
             ipv6: ipv6Enabled,
             mode: "rule",
             "unified-delay": true,
-            "tcp-concurrent": true,
+            "tcp-concurrent": false,
             "find-process-mode": "off",
             "log-level": "info",
             "geodata-loader": "standard",
@@ -844,8 +798,8 @@ function main(config) {
         "rule-providers": ruleProviders,
         rules: finalRules,
         sniffer: snifferConfig,
-        dns: fakeIPEnabled ? dnsConfigFakeIp : dnsConfig,
-        "geodata-mode": true,
+        dns: noFakeIP ? dnsConfig : dnsConfigFakeIp,
+        "geodata-mode": false,
         "geox-url": geoxURL,
     });
 
