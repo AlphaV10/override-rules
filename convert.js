@@ -269,38 +269,73 @@ function buildRules({ noQuic }) {
 
 const snifferConfig = {
     sniff: {
-        TLS: {
-            ports: [443, 8443],
-        },
         HTTP: {
             ports: [80, 8080, 8880],
+        },
+        TLS: {
+            ports: [443, 8443],
         },
         QUIC: {
             ports: [443, 8443],
         },
     },
-    "override-destination": false,
     enable: true,
     "force-dns-mapping": true,
-    "skip-domain": ["Mijia Cloud", "dlg.io.mi.com", "+.push.apple.com"],
+    "parse-pure-ip": true,
+    "override-destination": true,
+    "skip-domain": ["+.push.apple.com"],
+    "skip-dst-address": [
+        "91.105.192.0/23",
+        "91.108.4.0/22",
+        "91.108.8.0/21",
+        "91.108.16.0/21",
+        "91.108.56.0/22",
+        "95.161.64.0/20",
+        "149.154.160.0/20",
+        "185.76.151.0/24",
+        "2001:67c:4e8::/48",
+        "2001:b28:f23c::/47",
+        "2001:b28:f23f::/48",
+        "2a0a:f280:203::/48"
+    ],
 };
 
 function buildDnsConfig({ mode, fakeIpFilter }) {
     const config = {
         enable: true,
         ipv6: ipv6Enabled,
-        "prefer-h3": true,
+        "prefer-h3": false,
+        "respect-rules": false,
         "enhanced-mode": mode,
-        "default-nameserver": ["119.29.29.29", "223.5.5.5"],
-        nameserver: ["system", "223.5.5.5", "119.29.29.29", "180.184.1.1"],
-        fallback: [
-            "quic://dns0.eu",
-            "https://dns.cloudflare.com/dns-query",
-            "https://dns.sb/dns-query",
-            "tcp://208.67.222.222",
-            "tcp://8.26.56.2",
+        "default-nameserver": [
+            "tls://119.29.29.29",
+            "tls://223.5.5.5",
         ],
-        "proxy-server-nameserver": ["https://dns.alidns.com/dns-query", "tls://dot.pub"],
+        "proxy-server-nameserver": [
+            "https://doh.pub/dns-query",
+            "https://dns.alidns.com/dns-query",
+        ],
+        "direc-nameserver": [
+            "tls://119.29.29.29",
+            "tls://223.5.5.5",
+        ],
+        nameserver: [
+            "https://doh.pub/dns-query",
+            "https://dns.alidns.com/dns-query"
+        ],
+        fallback: [
+            `tls://1.1.1.1#${PROXY_GROUPS.SELECT}`,
+            `tls://8.8.8.8#${PROXY_GROUPS.SELECT}`,
+        ],
+        "fallback-filter": {
+            "geoip": true,
+            "geoip-code": "CN",
+            "geosite": ["GFW"],
+            "ipcidr": [
+                "240.0.0.0/4",
+                "0.0.0.0/32",
+            ],
+        },
     };
 
     if (fakeIpFilter) {
@@ -317,12 +352,17 @@ const dnsConfigFakeIp = buildDnsConfig({
         "geosite:private",
         "geosite:connectivity-check",
         "geosite:cn",
-        "Mijia Cloud",
-        "dig.io.mi.com",
-        "localhost.ptlogin2.qq.com",
-        "*.icloud.com",
-        "*.stun.*.*",
-        "*.stun.*.*.*",
+        "+.ntp.org",
+        "ntp.*.com",
+        "time.*.com",
+        "+.msftconnecttest.com",
+        "+.msftncsi.com",
+        "+.apple.com",
+        "+.icloud.com",
+        "+.mzstatic.com",
+        "+.googleapis.com",
+        "+.gstatic.com",
+        "cp.cloudflare.com",
     ],
 });
 
@@ -801,6 +841,10 @@ function main(config) {
         dns: noFakeIP ? dnsConfig : dnsConfigFakeIp,
         "geodata-mode": false,
         "geox-url": geoxURL,
+        "external-controller": "127.0.0.1:9090",
+        "external-ui-url": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
+        "external-ui": "dashboard",
+        "external-ui-name": "metacubexd",
     });
 
     return resultConfig;
