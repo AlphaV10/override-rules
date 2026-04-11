@@ -34,9 +34,9 @@ function parseNumber(value, defaultValue = 0) {
 
 function getTestPolicy(type = "url-test") {
     if (type === "url-test") {
-        return isPeakHour() ? { interval: 60, tolerance: 20 } : { interval: 120, tolerance: 50 };
+        return isPeakHour() ? { interval: 100, tolerance: 30 } : { interval: 300, tolerance: 50 };
     }
-    return isPeakHour() ? { interval: 150, tolerance: 20 } : { interval: 300, tolerance: 50 };
+    return isPeakHour() ? { interval: 120, tolerance: 30 } : { interval: 360, tolerance: 50 };
 }
 
 /**
@@ -270,20 +270,22 @@ function buildRules({ noQuic }) {
 const snifferConfig = {
     sniff: {
         HTTP: {
-            ports: [80, 8080, 8880],
+            ports: [ 80 ],
         },
         TLS: {
-            ports: [443, 8443],
+            ports: [ 443 ],
         },
         QUIC: {
-            ports: [443, 8443],
+            ports: [ 443 ],
         },
     },
     enable: true,
     "force-dns-mapping": true,
     "parse-pure-ip": true,
-    "override-destination": true,
-    "skip-domain": ["+.push.apple.com"],
+    "override-destination": false,
+    "skip-domain": [
+        "+.push.apple.com",
+    ],
     "skip-dst-address": [
         "91.105.192.0/23",
         "91.108.4.0/22",
@@ -308,29 +310,25 @@ function buildDnsConfig({ mode, fakeIpFilter }) {
         "respect-rules": false,
         "enhanced-mode": mode,
         "default-nameserver": [
-            "tls://119.29.29.29",
-            "tls://223.5.5.5",
+            "223.5.5.5",
         ],
         "proxy-server-nameserver": [
-            "https://doh.pub/dns-query",
-            "https://dns.alidns.com/dns-query",
+            "https://dns.alidns.com/dns-query&h3=true",
         ],
         "direc-nameserver": [
-            "tls://119.29.29.29",
-            "tls://223.5.5.5",
+            "quic://dns.alidns.com",
         ],
         nameserver: [
-            "https://doh.pub/dns-query",
-            "https://dns.alidns.com/dns-query"
+            "quic://dns.alidns.com",
         ],
         fallback: [
-            `tls://1.1.1.1#${PROXY_GROUPS.SELECT}`,
-            `tls://8.8.8.8#${PROXY_GROUPS.SELECT}`,
+            `https://8.8.8.8/dns-query#${PROXY_GROUPS.SELECT}&h3=true`,
+            `https://1.1.1.1/dns-query#${PROXY_GROUPS.SELECT}&h3=true`,
         ],
         "fallback-filter": {
             "geoip": true,
             "geoip-code": "CN",
-            "geosite": ["GFW"],
+            "geosite": [ "GFW" ],
             "ipcidr": [
                 "240.0.0.0/4",
                 "0.0.0.0/32",
