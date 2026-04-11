@@ -12,6 +12,7 @@ https://github.com/powerfullz/override-rules
 - noquic: 禁用 QUIC 流量（UDP 443，默认 false，false 表示允许 QUIC）
 - threshold: 国家节点数量小于该值时不显示分组 (默认 2)
 - regex: 使用正则过滤模式（include-all + filter）写入各国家代理组，而非直接枚举节点名称（默认 false）
+- dashboard: 启用 Dashboard 功能（默认 false，启用后会在配置中添加相关设置，以便开启内置 Dashboard）
 */
 
 const NODE_SUFFIX = "节点";
@@ -72,6 +73,7 @@ function buildFeatureFlags(args) {
         nofakeip: "noFakeIP",
         noquic: "noQuic",
         regex: "regexFilter",
+        dashboard: "dashboardEnabled",
     };
 
     const flags = Object.entries(spec).reduce((acc, [sourceKey, targetKey]) => {
@@ -98,6 +100,7 @@ const {
     noQuic,
     regexFilter,
     countryThreshold,
+    dashboardEnabled,
 } = buildFeatureFlags(rawArgs);
 
 function getCountryGroupNames(countryInfo, minCount) {
@@ -824,11 +827,18 @@ function main(config) {
             "find-process-mode": "off",
             "log-level": "info",
             "geodata-loader": "standard",
-            "external-controller": ":9999",
             "disable-keep-alive": !keepAliveEnabled,
             profile: {
                 "store-selected": true,
             },
+        });
+
+    if (dashboardEnabled)
+        Object.assign(resultConfig, {
+            "external-controller": "127.0.0.1:9090",
+            "external-ui-url": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
+            "external-ui": "dashboard",
+            "external-ui-name": "metacubexd",
         });
 
     Object.assign(resultConfig, {
@@ -839,10 +849,6 @@ function main(config) {
         dns: noFakeIP ? dnsConfig : dnsConfigFakeIp,
         "geodata-mode": false,
         "geox-url": geoxURL,
-        "external-controller": "127.0.0.1:9090",
-        "external-ui-url": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
-        "external-ui": "dashboard",
-        "external-ui-name": "metacubexd",
     });
 
     return resultConfig;
