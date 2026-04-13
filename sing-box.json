@@ -44,124 +44,6 @@
       "stack": "gvisor"
     }
   ],
-  "dns": {
-    "servers": [
-      {
-        "type": "fakeip",
-        "tag": "Fake-IP",
-        "inet4_range": "198.18.0.0/15",
-        "inet6_range": "fc00::/18"
-      },
-      {
-        "type": "quic",
-        "tag": "Local-DNS",
-        "server": "223.5.5.5",
-        "domain_resolver": "Local-DNS-Resolver"
-      },
-      {
-        "type": "https",
-        "tag": "Local-DNS-DoH",
-        "server": "223.5.5.5",
-        "path": "/dns-query",
-        "domain_resolver": "Local-DNS-Resolver"
-      },
-      {
-        "type": "udp",
-        "tag": "Local-DNS-Resolver",
-        "server": "223.5.5.5"
-      },
-      {
-        "type": "https",
-        "tag": "Remote-DNS",
-        "server": "8.8.8.8",
-        "path": "/dns-query",
-        "domain_resolver": "Remote-DNS-Resolver",
-        "detour": "🚀节点选择"
-      },
-      {
-        "type": "udp",
-        "tag": "Remote-DNS-Resolver",
-        "server": "8.8.8.8",
-        "detour": "🚀节点选择"
-      },
-      {
-        "type": "local",
-        "tag": "OS-DNS",
-        "prefer_go": false
-      }
-    ],
-    "rules": [
-      {
-        "rule_set": [ "GeoSite-Private" ],
-        "inbound": [
-          "mixed-in",
-          "tun-in"
-        ],
-        "action": "route",
-        "server": "OS-DNS"
-      },
-      {
-        "clash_mode": "direct",
-        "inbound": [
-          "mixed-in",
-          "tun-in"
-        ],
-        "action": "route",
-        "server": "Local-DNS"
-      },
-      {
-        "clash_mode": "global",
-        "inbound": [
-          "mixed-in",
-          "tun-in"
-        ],
-        "action": "route",
-        "server": "Remote-DNS"
-      },
-      {
-        "rule_set": [ "GeoSite-CN" ],
-        "action": "route",
-        "server": "Local-DNS"
-      },
-      {
-        "domain_regex": [
-          "^(?:ntp|time).+com$"
-        ],
-        "domain_suffix": [
-          "ntp.org",
-          "msftconnecttest.com",
-          "msftncsi.com",
-          "apple.com",
-          "icloud.com",
-          "mzstatic.com",
-          "googleapis.com",
-          "gstatic.com"
-        ],
-        "action": "route",
-        "server": "Remote-DNS"
-      },
-      {
-        "query_type": [
-          "A",
-          "AAAA"
-        ],
-        "inbound": [
-          "mixed-in",
-          "tun-in"
-        ],
-        "action": "route",
-        "server": "Fake-IP"
-      },
-      {
-        "rule_set": [ "GeoLocation-!CN" ],
-        "action": "route",
-        "server": "Remote-DNS"
-      }
-    ],
-    "disable_cache": false,
-    "disable_expire": false,
-    "final": "Remote-DNS"
-  },
   "outbounds": [
     {
       "type": "selector",
@@ -254,12 +136,6 @@
         "outbound": "direct-out"
       },
       {
-        "protocol": "quic",
-        "action": "reject",
-        "method": "default",
-        "no_drop": false
-      },
-      {
         "rule_set": [ "Category-Ads" ],
         "action": "reject",
         "method": "default",
@@ -274,11 +150,6 @@
         "clash_mode": "global",
         "action": "route",
         "outbound": "GLOBAL"
-      },
-      {
-        "network": "icmp",
-        "action": "route",
-        "outbound": "direct-out"
       },
       {
         "rule_set": [ "GeoSite-CN" ],
@@ -367,5 +238,89 @@
     "default_domain_resolver": {
       "server": "Local-DNS-DoH"
     }
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "fakeip",
+        "tag": "Fake-IP",
+        "inet4_range": "198.18.0.0/15"
+      },
+      {
+        "type": "quic",
+        "tag": "Local-DNS",
+        "server": "223.5.5.5",
+        "domain_resolver": "Local-DNS-Resolver"
+      },
+      {
+        "type": "https",
+        "tag": "Local-DNS-DoH",
+        "server": "223.5.5.5",
+        "path": "/dns-query",
+        "domain_resolver": "Local-DNS-Resolver"
+      },
+      {
+        "type": "udp",
+        "tag": "Local-DNS-Resolver",
+        "server": "223.5.5.5"
+      },
+      {
+        "type": "https",
+        "tag": "Remote-DNS",
+        "server": "8.8.8.8",
+        "path": "/dns-query",
+        "domain_resolver": "Remote-DNS-Resolver",
+        "detour": "🚀节点选择"
+      },
+      {
+        "type": "udp",
+        "tag": "Remote-DNS-Resolver",
+        "server": "8.8.8.8",
+        "detour": "🚀节点选择"
+      },
+      {
+        "type": "local",
+        "tag": "OS-DNS",
+        "prefer_go": false
+      }
+    ],
+    "rules": [
+      {
+        "rule_set": [ "GeoSite-Private" ],
+        "action": "route",
+        "server": "OS-DNS"
+      },
+      {
+        "clash_mode": "direct",
+        "action": "route",
+        "server": "Local-DNS"
+      },
+      {
+        "clash_mode": "global",
+        "action": "route",
+        "server": "Remote-DNS"
+      },
+      {
+        "rule_set": [ "GeoSite-CN" ],
+        "action": "route",
+        "server": "Local-DNS"
+      },
+      {
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "action": "route",
+        "server": "Fake-IP"
+      },
+      {
+        "rule_set": [ "GeoLocation-!CN" ],
+        "action": "route",
+        "server": "Remote-DNS"
+      }
+    ],
+    "disable_cache": false,
+    "disable_expire": false,
+    "final": "Remote-DNS"
   }
 }

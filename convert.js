@@ -36,15 +36,25 @@ function parseNumber(value, defaultValue = 0) {
 
 function getTestPolicy() {
     switch (frequency) {
-        case 2:
+        case 1:
             return {
                 leaf: { interval: 67, tolerance: 30 },
-                parent: { interval: 139, tolerance: 50 },
+                parent: { interval: 103, tolerance: 50 },
+            };
+        case 2:
+            return {
+                leaf: { interval: 127, tolerance: 50 },
+                parent: { interval: 193, tolerance: 70 },
+            };
+        case 5:
+            return {
+                leaf: { interval: 307, tolerance: 50 },
+                parent: { interval: 439, tolerance: 70 },
             };
     }
     return {
         leaf: { interval: 193, tolerance: 50 },
-        parent: { interval: 397, tolerance: 70 },
+        parent: { interval: 277, tolerance: 70 },
     };
 }
 
@@ -218,7 +228,7 @@ const ruleProviders = {
         behavior: "classical",
         format: "text",
         interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/AlphaV10/metaX@v0.0.8/ruleset/AdditionalFilter.list",
+        url: "https://gcore.jsdelivr.net/gh/AlphaV10/override-rules@v0.1.2/ruleset/AdditionalFilter.list",
         path: "./ruleset/AdditionalFilter.list",
     },
     AdditionalCDNResources: {
@@ -226,7 +236,7 @@ const ruleProviders = {
         behavior: "classical",
         format: "text",
         interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/AlphaV10/metaX@v0.0.8/ruleset/AdditionalCDNResources.list",
+        url: "https://gcore.jsdelivr.net/gh/AlphaV10/override-rules@v0.1.2/ruleset/AdditionalCDNResources.list",
         path: "./ruleset/AdditionalCDNResources.list",
     },
 };
@@ -605,8 +615,8 @@ function buildProxyGroups({
      */
     const frontProxySelector = landing
         ? defaultSelector.filter(
-              (name) => name !== PROXY_GROUPS.LANDING && name !== PROXY_GROUPS.FALLBACK
-          )
+            (name) => name !== PROXY_GROUPS.LANDING && name !== PROXY_GROUPS.FALLBACK
+        )
         : [];
 
     const policy = getTestPolicy();
@@ -630,36 +640,36 @@ function buildProxyGroups({
         },
         landing
             ? {
-                  name: "前置代理",
-                  icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Area.png",
-                  type: "select",
-                  /**
-                   * regex 模式：`include-all` 拉取所有节点，`exclude-filter` 排除落地节点，
-                   * 同时在 `proxies` 里附加手动指定的候选组名列表（各国家组等）。
-                   * 枚举模式：直接列出候选组名（落地节点已在构建 `frontProxySelector` 时过滤）。
-                   */
-                  ...(regexFilter
-                      ? {
-                            "include-all": true,
-                            "exclude-filter": LANDING_PATTERN,
-                            proxies: frontProxySelector,
-                        }
-                      : { proxies: frontProxySelector }),
-              }
+                name: "前置代理",
+                icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Area.png",
+                type: "select",
+                /**
+                 * regex 模式：`include-all` 拉取所有节点，`exclude-filter` 排除落地节点，
+                 * 同时在 `proxies` 里附加手动指定的候选组名列表（各国家组等）。
+                 * 枚举模式：直接列出候选组名（落地节点已在构建 `frontProxySelector` 时过滤）。
+                 */
+                ...(regexFilter
+                    ? {
+                        "include-all": true,
+                        "exclude-filter": LANDING_PATTERN,
+                        proxies: frontProxySelector,
+                    }
+                    : { proxies: frontProxySelector }),
+            }
             : null,
         landing
             ? {
-                  name: PROXY_GROUPS.LANDING,
-                  icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Airport.png",
-                  type: "select",
-                  /**
-                   * regex 模式：`include-all` + `filter` 动态筛选落地节点。
-                   * 枚举模式：直接列出已识别的落地节点名称。
-                   */
-                  ...(regexFilter
-                      ? { "include-all": true, filter: LANDING_PATTERN }
-                      : { proxies: landingNodes }),
-              }
+                name: PROXY_GROUPS.LANDING,
+                icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Airport.png",
+                type: "select",
+                /**
+                 * regex 模式：`include-all` + `filter` 动态筛选落地节点。
+                 * 枚举模式：直接列出已识别的落地节点名称。
+                 */
+                ...(regexFilter
+                    ? { "include-all": true, filter: LANDING_PATTERN }
+                    : { proxies: landingNodes }),
+            }
             : null,
         {
             name: PROXY_GROUPS.CLEAN,
@@ -704,16 +714,16 @@ function buildProxyGroups({
         },
         lowCostNodes.length > 0 || regexFilter
             ? {
-                  name: PROXY_GROUPS.LOW_COST,
-                  icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Lab.png",
-                  type: "url-test",
-                  url: "https://cp.cloudflare.com/generate_204",
-                  lazy: true,
-                  ...policy.leaf,
-                  ...(!regexFilter
-                      ? { proxies: lowCostNodes }
-                      : { "include-all": true, filter: "(?i)0\\.[0-5]|低倍率|省流|大流量|实验性" }),
-              }
+                name: PROXY_GROUPS.LOW_COST,
+                icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Lab.png",
+                type: "url-test",
+                url: "https://cp.cloudflare.com/generate_204",
+                lazy: true,
+                ...policy.leaf,
+                ...(!regexFilter
+                    ? { proxies: lowCostNodes }
+                    : { "include-all": true, filter: "(?i)0\\.[0-5]|低倍率|省流|大流量|实验性" }),
+            }
             : null,
         {
             name: PROXY_GROUPS.FOREIGN,

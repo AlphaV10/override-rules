@@ -209,18 +209,28 @@ function toNumber(value, fallbackValue = 0) {
     return fallbackValue;
 }
 
-function getHealthCheck(frequency = 1) {
+function getHealthCheck(frequency = 3) {
     switch (frequency) {
-        case 2: // 高频检查，应对质量不佳的机场
+        case 1: // 1 分钟
             return {
                 leaf: { interval: "67s", tolerance: 30, idle_timeout: "5m" },
                 parent: { interval: "103s", tolerance: 50, idle_timeout: "5m" },
             };
+        case 2: // 2 分钟
+            return {
+                leaf: { interval: "127s", tolerance: 50, idle_timeout: "10m" },
+                parent: { interval: "193s", tolerance: 70, idle_timeout: "10m" },
+            };
+        case 5: // 5 分钟
+            return {
+                leaf: { interval: "307s", tolerance: 50, idle_timeout: "25m" },
+                parent: { interval: "439s", tolerance: 70, idle_timeout: "25m" },
+            };
     }
-    // 默认频率
+    // 3 分钟
     return {
-        leaf: { interval: "193s", tolerance: 50, idle_timeout: "10m" },
-        parent: { interval: "277s", tolerance: 70, idle_timeout: "10m" },
+        leaf: { interval: "193s", tolerance: 50, idle_timeout: "15m" },
+        parent: { interval: "277s", tolerance: 70, idle_timeout: "15m" },
     };
 }
 
