@@ -218,7 +218,7 @@ const ruleProviders = {
         behavior: "classical",
         format: "text",
         interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/AlphaV10/metaX@v0.0.1/ruleset/AdditionalFilter.list",
+        url: "https://gcore.jsdelivr.net/gh/AlphaV10/metaX@v0.0.8/ruleset/AdditionalFilter.list",
         path: "./ruleset/AdditionalFilter.list",
     },
     AdditionalCDNResources: {
@@ -226,7 +226,7 @@ const ruleProviders = {
         behavior: "classical",
         format: "text",
         interval: 86400,
-        url: "https://gcore.jsdelivr.net/gh/AlphaV10/metaX@v0.0.1/ruleset/AdditionalCDNResources.list",
+        url: "https://gcore.jsdelivr.net/gh/AlphaV10/metaX@v0.0.8/ruleset/AdditionalCDNResources.list",
         path: "./ruleset/AdditionalCDNResources.list",
     },
 };
