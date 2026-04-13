@@ -13,6 +13,7 @@ https://github.com/powerfullz/override-rules
 - threshold: 国家节点数量小于该值时不显示分组 (默认 2)
 - regex: 使用正则过滤模式（include-all + filter）写入各国家代理组，而非直接枚举节点名称（默认 false）
 - dashboard: 启用 Dashboard 功能（默认 false，启用后会在配置中添加相关设置，以便开启内置 Dashboard）
+- frequency: 设置检查检查频率（1: 一般；2：高频）
 */
 
 const NODE_SUFFIX = "节点";
@@ -33,25 +34,18 @@ function parseNumber(value, defaultValue = 0) {
     return isNaN(num) ? defaultValue : num;
 }
 
-function getTestPolicy(type = "url-test") {
-    if (type === "url-test") {
-        return isPeakHour() ? { interval: 100, tolerance: 30 } : { interval: 300, tolerance: 50 };
+function getTestPolicy() {
+    switch (frequency) {
+        case 2:
+            return {
+                leaf: { interval: 67, tolerance: 30 },
+                parent: { interval: 139, tolerance: 50 },
+            };
     }
-    return isPeakHour() ? { interval: 120, tolerance: 30 } : { interval: 360, tolerance: 50 };
-}
-
-/**
- * 判断当前是否为高峰时期 (17:00 - 01:00)
- * @returns {boolean} 如果是高峰期返回 true，否则返回 false
- */
-function isPeakHour() {
-    // 1. 获取当前本地时间对象
-    const now = new Date();
-    // 2. 获取当前小时数 (返回 0-23 之间的整数)
-    const hours = now.getHours();
-    // 3. 判断是否在 17 点（含）到 01 点（不含）之间
-    // 注意：在 Date 对象中，24:00 实际上是次日的 0:00，所以 23 点是当天最后的小时
-    return hours >= 17 || hours < 1;
+    return {
+        leaf: { interval: 193, tolerance: 50 },
+        parent: { interval: 397, tolerance: 70 },
+    };
 }
 
 /**
@@ -81,10 +75,8 @@ function buildFeatureFlags(args) {
         return acc;
     }, {});
 
-    /**
-     * `threshold` 是数字参数，不经过 parseBool，需单独处理。
-     */
     flags.countryThreshold = parseNumber(args.threshold, 2);
+    flags.frequency = parseNumber(args.frequency);
 
     return flags;
 }
@@ -101,6 +93,7 @@ const {
     regexFilter,
     countryThreshold,
     dashboardEnabled,
+    frequency,
 } = buildFeatureFlags(rawArgs);
 
 function getCountryGroupNames(countryInfo, minCount) {
@@ -125,7 +118,7 @@ function stripNodeSuffix(groupNames) {
 }
 
 const PROXY_GROUPS = {
-    SELECT: "选择代理",
+    SELECT: "节点选择",
     MANUAL: "手动选择",
     CLEAN: "纯净优选",
     FALLBACK: "故障转移",
@@ -145,7 +138,7 @@ function buildBaseLists({ landing, lowCostNodes, countryGroupNames }) {
     const lowCost = lowCostNodes.length > 0 || regexFilter;
 
     /**
-     * "选择代理"组的顶层候选列表：故障转移 → 落地节点（可选）→ 各国家组 → 低倍率（可选）→ 手动 → 直连。
+     * "节点选择"组的顶层候选列表：故障转移 → 落地节点（可选）→ 各国家组 → 低倍率（可选）→ 手动 → 直连。
      */
     const defaultSelector = buildList(
         PROXY_GROUPS.CLEAN,
@@ -159,7 +152,7 @@ function buildBaseLists({ landing, lowCostNodes, countryGroupNames }) {
     );
 
     /**
-     * 大多数策略组的通用候选列表：以"选择代理"为首选，再跟各国家组、低倍率、手动、直连。
+     * 大多数策略组的通用候选列表：以"节点选择"为首选，再跟各国家组、低倍率、手动、直连。
      */
     const defaultProxies = buildList(
         PROXY_GROUPS.SELECT,
@@ -182,7 +175,7 @@ function buildBaseLists({ landing, lowCostNodes, countryGroupNames }) {
 
     /**
      * "故障转移"组的候选列表：落地节点（可选）→ 各国家组 → 低倍率（可选）→ 手动 → 直连。
-     * 不包含"选择代理"自身，避免循环引用。
+     * 不包含"节点选择"自身，避免循环引用。
      */
     const defaultFallback = buildList(
         landing && PROXY_GROUPS.LANDING,
@@ -273,22 +266,20 @@ function buildRules({ noQuic }) {
 const snifferConfig = {
     sniff: {
         HTTP: {
-            ports: [ 80 ],
+            ports: [80],
         },
         TLS: {
-            ports: [ 443 ],
+            ports: [443],
         },
         QUIC: {
-            ports: [ 443 ],
+            ports: [443],
         },
     },
     enable: true,
     "force-dns-mapping": true,
     "parse-pure-ip": true,
     "override-destination": false,
-    "skip-domain": [
-        "+.push.apple.com",
-    ],
+    "skip-domain": ["+.push.apple.com"],
     "skip-dst-address": [
         "91.105.192.0/23",
         "91.108.4.0/22",
@@ -301,7 +292,7 @@ const snifferConfig = {
         "2001:67c:4e8::/48",
         "2001:b28:f23c::/47",
         "2001:b28:f23f::/48",
-        "2a0a:f280:203::/48"
+        "2a0a:f280:203::/48",
     ],
 };
 
@@ -312,30 +303,19 @@ function buildDnsConfig({ mode, fakeIpFilter }) {
         "prefer-h3": false,
         "respect-rules": false,
         "enhanced-mode": mode,
-        "default-nameserver": [
-            "223.5.5.5",
-        ],
-        "proxy-server-nameserver": [
-            "https://dns.alidns.com/dns-query&h3=true",
-        ],
-        "direc-nameserver": [
-            "quic://dns.alidns.com",
-        ],
-        nameserver: [
-            "quic://dns.alidns.com",
-        ],
+        "default-nameserver": ["223.5.5.5"],
+        "proxy-server-nameserver": ["https://dns.alidns.com/dns-query&h3=true"],
+        "direc-nameserver": ["quic://dns.alidns.com"],
+        nameserver: ["quic://dns.alidns.com"],
         fallback: [
             `https://8.8.8.8/dns-query#${PROXY_GROUPS.SELECT}&h3=true`,
             `https://1.1.1.1/dns-query#${PROXY_GROUPS.SELECT}&h3=true`,
         ],
         "fallback-filter": {
-            "geoip": true,
+            geoip: true,
             "geoip-code": "CN",
-            "geosite": [ "GFW" ],
-            "ipcidr": [
-                "240.0.0.0/4",
-                "0.0.0.0/32",
-            ],
+            geosite: ["GFW"],
+            ipcidr: ["240.0.0.0/4", "0.0.0.0/32"],
         },
     };
 
@@ -555,7 +535,7 @@ function buildCountryProxyGroups({ countries, landing, loadBalance, regexFilter,
         ? Object.fromEntries(countryInfo.map((item) => [item.country, item.nodes]))
         : null;
 
-    const fastestPolicy = getTestPolicy("url-test");
+    const policy = getTestPolicy();
 
     for (const country of countries) {
         const meta = countriesMeta[country];
@@ -596,7 +576,7 @@ function buildCountryProxyGroups({ countries, landing, loadBalance, regexFilter,
             Object.assign(groupConfig, {
                 url: "https://cp.cloudflare.com/generate_204",
                 lazy: true,
-                ...fastestPolicy,
+                ...policy.leaf,
             });
         }
 
@@ -629,8 +609,7 @@ function buildProxyGroups({
           )
         : [];
 
-    const fallbackPolicy = getTestPolicy("fallback");
-    const fastestPolicy = getTestPolicy("url-test");
+    const policy = getTestPolicy();
 
     const foreignProxyGroups = countries.flatMap((country) => {
         return !["香港", "澳门", "台湾"].includes(country) ? `${country}${NODE_SUFFIX}` : [];
@@ -687,7 +666,7 @@ function buildProxyGroups({
             icon: "https://gcore.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png",
             type: "url-test",
             lazy: true,
-            ...fastestPolicy,
+            ...policy.leaf,
             proxies: cleanNodes,
         },
         {
@@ -697,7 +676,7 @@ function buildProxyGroups({
             url: "https://cp.cloudflare.com/generate_204",
             proxies: defaultFallback,
             lazy: true,
-            ...fallbackPolicy,
+            ...policy.parent,
         },
         {
             name: "静态资源",
@@ -730,7 +709,7 @@ function buildProxyGroups({
                   type: "url-test",
                   url: "https://cp.cloudflare.com/generate_204",
                   lazy: true,
-                  ...fastestPolicy,
+                  ...policy.leaf,
                   ...(!regexFilter
                       ? { proxies: lowCostNodes }
                       : { "include-all": true, filter: "(?i)0\\.[0-5]|低倍率|省流|大流量|实验性" }),
@@ -743,7 +722,7 @@ function buildProxyGroups({
             url: "https://cp.cloudflare.com/generate_204",
             proxies: foreignProxyGroups,
             lazy: true,
-            ...fallbackPolicy,
+            ...policy.parent,
         },
         ...countryProxyGroups,
     ].filter(Boolean);
@@ -836,7 +815,8 @@ function main(config) {
     if (dashboardEnabled)
         Object.assign(resultConfig, {
             "external-controller": "127.0.0.1:9090",
-            "external-ui-url": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
+            "external-ui-url":
+                "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
             "external-ui": "dashboard",
             "external-ui-name": "metacubexd",
         });
