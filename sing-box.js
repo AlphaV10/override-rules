@@ -188,25 +188,46 @@ function isEnabled(option) {
     return v === "true" || v === "on" || v === "yes" || v === "y" || v === "1";
 }
 
-function getHealthCheck(frequency = "1") {
-    switch (`${frequency}`) {
-        case "2": // 高频检查，应对质量不佳的机场
+function toNumber(value, fallbackValue = 0) {
+    const valueType = typeof value;
+
+    if (valueType === "number") {
+        return Number.isNaN(value) ? fallbackValue : value;
+    }
+    if (valueType === "string") {
+        const trimmedStr = value.trim();
+        if (trimmedStr === "") {
+            return fallbackValue;
+        }
+        const parsedNum = Number(trimmedStr);
+        return Number.isNaN(parsedNum) ? fallbackValue : parsedNum;
+    }
+    if (valueType === "bigint") {
+        return Number(value);
+    }
+
+    return fallbackValue;
+}
+
+function getHealthCheck(frequency = 1) {
+    switch (frequency) {
+        case 2: // 高频检查，应对质量不佳的机场
             return {
                 leaf: { interval: "67s", tolerance: 30, idle_timeout: "5m" },
-                parent: { interval: "139s", tolerance: 50, idle_timeout: "5m" },
+                parent: { interval: "103s", tolerance: 50, idle_timeout: "5m" },
             };
     }
     // 默认频率
     return {
         leaf: { interval: "193s", tolerance: 50, idle_timeout: "10m" },
-        parent: { interval: "397s", tolerance: 80, idle_timeout: "10m" },
+        parent: { interval: "277s", tolerance: 70, idle_timeout: "10m" },
     };
 }
 
 // ---------- 脚本主体功能开始 ----------
 
 const dashboard = isEnabled("dashboard");
-const frequency = $arguments.frequency ?? 1;
+const frequency = $arguments.frequency ? toNumber($arguments.frequency) : 1;
 
 // $substore.info("---------- 111");
 // $substore.info(JSON.stringify($arguments, null, 2));
